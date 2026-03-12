@@ -1,108 +1,70 @@
-# Bitcoin Time Series Analysis & Forecasting
+# Lab 2: Exponential Smoothing & ETS Models
 
-![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
-![License](https://img.shields.io/badge/License-MIT-green)
-![Status](https://img.shields.io/badge/Status-Complete-brightgreen)
+## Objective
+Apply State-Space models to the **Daily Climate Delhi Dataset** to forecast mean temperature using various Exponential Smoothing techniques.
 
-## 📌 Overview
+## Dataset
+- **Source**: [Daily Climate Time Series Data](https://www.kaggle.com/datasets/sumanthvrao/daily-climate-time-series-data) (Kaggle)
+- **Target Variable**: `meantemp` (Daily mean temperature in Delhi)
+- **Train**: `DailyDelhiClimateTrain.csv`
+- **Test**: `DailyDelhiClimateTest.csv`
 
-This project applies **classical statistical time series techniques** to forecast Bitcoin (BTC/USD) prices using 1-minute interval historical data. The analysis covers the full pipeline from raw data ingestion through preprocessing, stationarity testing, model selection, and evaluation.
+## Tasks Completed
 
----
+### 1. Data Loading & Preprocessing
+- Loaded dataset via `kagglehub`
+- Converted date column to `DatetimeIndex` with daily frequency (`'D'`)
 
-## 📂 Dataset
+### 2. Seasonal Decomposition
+- Performed both **Additive** and **Multiplicative** decomposition with `period=365`
+- **Conclusion**: Multiplicative decomposition chosen — residuals are smaller than in the additive case
 
-- **Source:** [Kaggle - Comprehensive BTC/USD 1M Data](https://www.kaggle.com/datasets/imranbukhari/comprehensive-btcusd-1m-data)
-- **File:** `BTCUSD_1m_Combined_Index.csv`
-- **Target Feature:** `Close` price only
-- **Resampled To:** Daily frequency (`D`) using `.last()` aggregation
+### 3. Simple Exponential Smoothing (SES)
+- Fitted `SimpleExpSmoothing` with optimized alpha (~0.78)
+- SES captures level but lacks trend/seasonality — eliminated from final comparison
 
----
+### 4. Holt's Linear Trend Model
+- Tested additive and multiplicative trend, with and without damping
+- **Insight**: Damping has minimal effect on in-sample fit but matters for out-of-sample forecasts (prevents unbounded trend growth)
 
-## 🔬 Methodology
+### 5. ETS State-Space Models (Additive vs. Multiplicative)
+- Fitted `ETSModel` with configurations:
+  - **Additive**: `ETS(A,A,A)` — error='add', trend='add', seasonal='add'
+  - **Multiplicative**: `ETS(M,A,M)` — error='mul', trend='add', seasonal='mul'
+- **Ljung-Box Test**:
+  - Additive: p < 0.05 → residuals have remaining autocorrelation ❌
+  - Multiplicative: p > 0.05 → residuals are white noise ✅
+- **Error Metrics**: Multiplicative slightly outperforms additive on MAE/MSE/RMSE
 
-### 1. Data Preprocessing & Resampling
-- Parsed datetime index from 1-minute OHLCV data
-- Resampled to daily close prices
-- Removed NaN values post-resampling
+### 6. Holt-Winters (Triple Exponential Smoothing)
+- Fitted `ExponentialSmoothing` with `trend='add'`, `seasonal='add'`, `seasonal_periods=365`
+- Also tested fully multiplicative variant
 
-### 2. Time Series Decomposition
-- Applied **multiplicative decomposition** (`period=12`)
-- Extracted: **Trend**, **Seasonality**, and **Residuals**
+### 7. Forecasting & Evaluation
+- Generated out-of-sample forecasts on the test set for ETS, Holt-Winters, and SES
+- SES produces a flat forecast line → eliminated
+- ETS and Holt-Winters both capture seasonal patterns in forecasts
 
-### 3. Stationarity Testing
-- Performed **Augmented Dickey-Fuller (ADF) Test**
-- Raw series → **Non-Stationary** (p-value > 0.05)
-- Applied **log transformation + first-order differencing**
-- Differenced log series → **Stationary** (p-value < 0.05)
+### 8. Final Model Selection
+| Model | MAE | MSE | RMSE |
+|-------|-----|-----|------|
+| ETS (A,A,A) | Computed | Computed | Computed |
+| Holt-Winters (Add) | Computed | Computed | Computed |
 
-### 4. ACF & PACF Analysis
-- Plotted ACF and PACF on the stationary series (30 lags)
-- Identified no significant seasonality
-- Suggested AR order `p=1–2`, MA order `q=1–2`
+**Winner: Holt-Winters** — lower error metrics on fitted values
 
-### 5. Model Building
-| Library | Best Model Found |
-|---|---|
-| Manual | `ARIMA(2,1,0)` |
-| `pmdarima` AutoARIMA | `ARIMA(0,1,1)` with intercept |
-| `statsforecast` AutoARIMA | `ARIMA(2,1,2)(1,0,1)[30]` with drift |
+## Key Takeaways
+- Multiplicative models better suit this dataset based on Ljung-Box residual diagnostics
+- Damped trend is recommended for long-horizon climate forecasts to avoid unrealistic extrapolation
+- SES is too simplistic for seasonal data — it only captures level
+- Both ETS and Holt-Winters perform well; Holt-Winters edges out on in-sample error
 
-### 6. Evaluation Metrics
-- **MAE** – Mean Absolute Error
-- **RMSE** – Root Mean Squared Error
-- **MAPE** – Mean Absolute Percentage Error
+## Libraries Used
+- `pandas`, `numpy`, `matplotlib`
+- `statsmodels` (seasonal_decompose, SimpleExpSmoothing, ExponentialSmoothing, ETSModel)
+- `scikit-learn` (mean_absolute_error, mean_squared_error)
+- `kagglehub`
 
----
-
-## 🛠️ Tech Stack
-
-| Category | Libraries |
-|---|---|
-| Data Manipulation | `pandas`, `numpy` |
-| Visualization | `matplotlib` |
-| Statistical Modeling | `statsmodels` |
-| Auto Model Selection | `pmdarima`, `statsforecast` |
-| Deep Learning Check | `torch` (GPU detection) |
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
+## How to Run
 ```bash
-pip install pandas numpy matplotlib statsmodels pmdarima statsforecast kagglehub torch
-```
-
-### Run the Notebook
-```bash
-jupyter notebook Lab1-Student-Tasks.ipynb
-```
-
----
-
-## 📊 Results
-
-- The raw BTC/USD price series is **non-stationary** due to a strong upward trend
-- Log differencing successfully removes the trend, yielding a stationary series
-- The **statsforecast AutoARIMA** model identified a seasonal ARIMA structure with a 30-day period
-- Visual forecasts and confidence intervals are plotted against actual test data
-
----
-
-## 📁 Project Structure
-
-```
-Time series Analysis/
-│
-├── Lab1-Student-Tasks.ipynb   # Main analysis notebook
-├── README.md                  # Project documentation
-└── data/                      # Downloaded via kagglehub (auto-generated)
-```
-
----
-
-## 🤝 Acknowledgements
-
-- Dataset by [imranbukhari](https://www.kaggle.com/imranbukhari) on Kaggle
-- Built as part of **ITI 9-Month AI & ML Track** coursework
+pip install pandas numpy matplotlib statsmodels scikit-learn kagglehub
